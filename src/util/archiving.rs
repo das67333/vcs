@@ -1,4 +1,4 @@
-use std::fs::{create_dir_all, set_permissions, File, Permissions};
+use std::fs::{create_dir_all, File};
 use std::io::{copy, prelude::Read, Write};
 use std::path::Path;
 use zip::result::{ZipError, ZipResult};
@@ -29,9 +29,13 @@ pub fn zip(src_dir: &Path, dst_archive: &Path) -> ZipResult<()> {
             continue;
         }
         let name_as_str = name_as_path.as_os_str().to_str().unwrap();
+
+        // options are changed in unix and PRESERVE_PERMISSIONS case
+        #[allow(unused_mut)]
         let mut options = FileOptions::default();
 
         if PRESERVE_PERMISSIONS {
+            #[cfg(unix)]
             if let Ok(metadata) = path.metadata() {
                 use std::os::unix::fs::PermissionsExt;
                 options = options.unix_permissions(metadata.permissions().mode());
@@ -62,6 +66,7 @@ pub fn unzip(src_archive: &Path, dst_dir: &Path) -> ZipResult<()> {
         let mut file = archive.by_index(i)?;
         // unwrap: "file" is always inside "archive"
         let path = dst_dir.join(file.enclosed_name().unwrap());
+        // '/' is a dirty hack in zip library and should not be replaced with std::path::MAIN_SEPARATOR
         if file.name().ends_with('/') {
             create_dir_all(&path)?;
         } else {
@@ -75,9 +80,13 @@ pub fn unzip(src_archive: &Path, dst_dir: &Path) -> ZipResult<()> {
         }
 
         if PRESERVE_PERMISSIONS {
-            use std::os::unix::fs::PermissionsExt;
-            if let Some(mode) = file.unix_mode() {
-                set_permissions(&path, Permissions::from_mode(mode))?;
+            #[cfg(unix)]
+            {
+                use std::fs::{set_permissions, Permissions};
+                use std::os::unix::fs::PermissionsExt;
+                if let Some(mode) = file.unix_mode() {
+                    set_permissions(&path, Permissions::from_mode(mode))?;
+                }
             }
         }
     }

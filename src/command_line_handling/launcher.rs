@@ -1,6 +1,6 @@
 use super::parser::CommandLineArgumentsParser;
 
-pub fn run_command_from_parser(parser: &CommandLineArgumentsParser) -> String {
+pub fn run_command_from_parser(parser: &CommandLineArgumentsParser) {
     use super::parser::VcsCommands::*;
     use crate::vcs_commands::*;
 
