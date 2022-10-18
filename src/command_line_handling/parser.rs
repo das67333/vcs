@@ -43,19 +43,19 @@ pub enum VcsCommands {
         commit_hash: Option<String>,
     },
 
-    /// Create a new branch from the current commit in the master
+    /// Create a new branch from the current commit in master
     #[command(visible_alias("new_branch"))]
     NewBranch {
         #[arg(short, long, value_name("BRANCH_NAME"))]
         name: String,
     },
 
-    /// Merge the branch into the master. The current commit must be the last one in the master
+    /// Merge the branch into master. The current commit must be the last one in master
     Merge {
         #[arg(short, long, value_name("BRANCH_NAME"))]
         branch: String,
     },
 
-    /// List commits that are reachable by following the parent links from the current commit
+    /// List commits that are reachable by following parent links from current commit
     Log,
 }

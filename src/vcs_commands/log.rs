@@ -1,25 +1,49 @@
-pub fn run() -> String {
-    format!(
-        "commit 2f3417b885724c3c5a0a383827080a9393ce69e9 (master)
-Date:   Tue Oct 26 12:49:27 2021 +0100
-Message: add dt_to_ms_timestamp
-Changes:
-\tmodified path/to/modified/file.rs
-\tmodified path/to/modified/file2.rs
-\tadded path/to/new/file.rs
+use crate::util::hash::VcsHash;
+use crate::util::vcs_state::VcsState;
+use indoc::indoc;
+use std::io::Error;
+use std::path::Path;
 
-commit 5ab279df6c80b139290af6ce60939b8fdfba242c
-Date:   Tue Oct 26 12:36:46 2021 +0100
-Message: Merged branch branch_with_feature.                                              
-Changes:
-\tmodified lok/kek.txt
-\tmodified move/to/london.txt
-\tadded new/rust/course.rs
-\tadded new/rust/project.rs
+/// Lists the current commit's ancestors
+pub fn run(repos_root: &Path) -> Result<String, Error> {
+    let state = VcsState::load(&repos_root)?;
+    let mut hash = state.head;
+    let mut result = String::new();
+    while hash != VcsHash::zero() {
+        // unwrap: assume the state.commits is valid
+        let commit = state.commits.iter().find(|&x| hash == x.hash).unwrap();
+        let changes = if commit.changes.is_empty() {
+            "No changes\n".to_owned()
+        } else {
+            let mut temp = "Changes\n".to_owned();
+            for file in commit.changes.modified.iter() {
+                temp.extend(format!("  modified {file}\n").chars());
+            }
+            for file in commit.changes.added.iter() {
+                temp.extend(format!("  added {file}\n").chars());
+            }
+            for file in commit.changes.deleted.iter() {
+                temp.extend(format!("  deleted {file}\n").chars());
+            }
+            temp
+        };
 
-commit ffc5ba1b18669c75d341e6be22c3f685237831b5
-Date:   Tue Oct 26 14:10:03 2021 +0300
-Message: Initial commit
-No changes"
-    )
+        result.extend(
+            format!(
+                indoc! {"commit {}
+                Date: {}
+                Message: {}
+                {}\n"},
+                commit.hash,
+                commit.time.format("%a %b %-e %X %Y %z"),
+                commit.message,
+                changes
+            )
+            .chars(),
+        );
+        hash = commit.parent;
+    }
+    result.pop();
+    result.pop();
+    Ok(result)
 }

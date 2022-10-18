@@ -1,13 +1,14 @@
-use crate::command_line_handling::{
-    launcher::run_command_from_parser, parser::CommandLineArgumentsParser,
-};
+use crate::command_line_handling::launcher::run_command_from_parser;
+use crate::command_line_handling::parser::CommandLineArgumentsParser;
 use clap::Parser;
+use std::io::Error;
 
+/// Simple Version Control System
 pub struct Application {
     parser: CommandLineArgumentsParser,
 }
 
-// arguments are taken from the command line by default
+// arguments are taken from command line by default
 impl Default for Application {
     fn default() -> Self {
         Application {
@@ -29,11 +30,20 @@ where
 }
 
 impl Application {
-    // fn configure(&mut self) {
-    //     self.parser = CommandLineArgumentsParser::parse();
-    // }
-
     pub fn run(&self) {
-        println!("{}", run_command_from_parser(&self.parser));
+        match run_command_from_parser(&self.parser) {
+            Ok(s) => {
+                println!("{}", s)
+            }
+            Err(e) => {
+                println!("{}", e);
+            }
+        }
+    }
+
+    pub fn try_run(&self) -> Result<(), Error> {
+        let output = run_command_from_parser(&self.parser)?;
+        println!("{}", output);
+        Ok(())
     }
 }

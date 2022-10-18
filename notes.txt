@@ -1,4 +1,0 @@
-~/projects/rust/vcs/target/debug/vcs
-indoc ???
-
-store commit changes!

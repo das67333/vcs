@@ -1,33 +1,33 @@
 use std::fs::{create_dir_all, File};
 use std::io::{copy, prelude::Read, Write};
 use std::path::Path;
-use zip::result::{ZipError, ZipResult};
+use walkdir::WalkDir;
+use zip::result::ZipError;
 use zip::write::FileOptions;
+use zip::ZipWriter;
 
 const PRESERVE_PERMISSIONS: bool = false;
 
-/// Compress directory with ".vcs" directory excluded
-pub fn zip(src_dir: &Path, dst_archive: &Path) -> ZipResult<()> {
+/// Compresses the given directory with ".vcs" subdirectory excluded
+pub fn zip(src_dir: &Path, dst_archive: &Path) -> Result<(), ZipError> {
     if !src_dir.is_dir() {
-        return Err(ZipError::FileNotFound);
+        panic!("zip can be applyed to directories only");
     }
 
-    let mut zip_writer = zip::ZipWriter::new(File::create(dst_archive)?);
+    let mut zip_writer = ZipWriter::new(File::create(dst_archive)?);
     let mut buffer = Vec::new();
-    for entry in walkdir::WalkDir::new(src_dir)
-        .into_iter()
-        .filter_map(|e| e.ok())
-    {
+    // ignore all inaccessible subdirectories
+    for entry in WalkDir::new(src_dir).into_iter().filter_map(|e| e.ok()) {
         let path = entry.path();
         // unwrap: "src_dir" is always a prefix of "path"
         let name_as_path = path.strip_prefix(src_dir).unwrap();
-        // unwrap: "path" must be at least Unicode
         if name_as_path
             .components()
-            .any(|x| x.as_os_str().to_str().unwrap() == ".vcs")
+            .any(|x| x.as_os_str().to_str() == Some(".vcs"))
         {
             continue;
         }
+        // unwrap: "name_as_path" must be at least Unicode
         let name_as_str = name_as_path.as_os_str().to_str().unwrap();
 
         // options are changed in unix and PRESERVE_PERMISSIONS case
@@ -56,8 +56,8 @@ pub fn zip(src_dir: &Path, dst_archive: &Path) -> ZipResult<()> {
     Ok(())
 }
 
-/// Extract zip file
-pub fn unzip(src_archive: &Path, dst_dir: &Path) -> ZipResult<()> {
+/// Extracts the given zip archive
+pub fn unzip(src_archive: &Path, dst_dir: &Path) -> Result<(), ZipError> {
     let file = File::open(src_archive)?;
 
     let mut archive = zip::ZipArchive::new(file)?;
@@ -71,7 +71,7 @@ pub fn unzip(src_archive: &Path, dst_dir: &Path) -> ZipResult<()> {
             create_dir_all(&path)?;
         } else {
             if let Some(par) = path.parent() {
-                if !par.exists() {
+                if !par.try_exists()? {
                     create_dir_all(&par)?;
                 }
             }
@@ -91,4 +91,25 @@ pub fn unzip(src_archive: &Path, dst_dir: &Path) -> ZipResult<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_archiving() -> Result<(), std::io::Error> {
+        let path_dir = std::path::Path::new("temp_dir");
+        let path_file = path_dir.join("temp_file.txt");
+        let path_archive = std::path::Path::new("temp_archive");
+        let contents = "abbbcc";
+
+        std::fs::create_dir(&path_dir)?;
+        std::fs::write(&path_file, contents)?;
+        super::zip(&path_dir, &path_archive)?;
+        std::fs::remove_dir_all(&path_dir)?;
+        super::unzip(&path_archive, &path_dir)?;
+        std::fs::remove_file(&path_archive)?;
+        assert_eq!(std::fs::read_to_string(&path_file)?, contents);
+        std::fs::remove_dir_all(&path_dir)?;
+        Ok(())
+    }
 }
